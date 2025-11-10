@@ -75,7 +75,7 @@ stemplore-question-generator/
 
 1. **Clone the repository**
 ```bash
-git clone <repository-url>
+git clone https://github.com/shreyas-pedda/STEMplore.git
 cd STEMplore
 ```
 
@@ -158,7 +158,7 @@ Run basic tests:
 ```bash
 python -m pytest tests/
 ```
-Using the pytest library will discover any tests following the proper naming convention and run them. Use this for unit tets.
+Using the pytest library will discover any tests following the proper naming convention and run them. Use this for unit tests.
 
 ## Known Limitations (Prototype Phase)
 
