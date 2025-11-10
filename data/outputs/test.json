@@ -1,0 +1,117 @@
+[
+  {
+    "type": "SELECT",
+    "question": "What is considered the fundamental building block of everything around us?",
+    "order": 1,
+    "challenge_options": [
+      {
+        "text": "Molecules",
+        "correct": false
+      },
+      {
+        "text": "Compounds",
+        "correct": false
+      },
+      {
+        "text": "Atoms",
+        "correct": true
+      },
+      {
+        "text": "Mixtures",
+        "correct": false
+      } loop
+    ]
+  },
+  {
+    "type": "SELECT",
+    "question": "When you examine elements closely, what are they found to be composed of?",
+    "order": 2,
+    "challenge_options": [
+      {
+        "text": "Ions",
+        "correct": false
+      },
+      {
+        "text": "Isotopes",
+        "correct": false
+      },
+      {
+        "text": "Subatomic particles",
+        "correct": false
+      },
+      {
+        "text": "Atoms",
+        "correct": true
+      }
+    ]
+  },
+  {
+    "type": "SELECT",
+    "question": "A pure substance consisting of only one single type of atom is known as what?",
+    "order": 3,
+    "challenge_options": [
+      {
+        "text": "A compound",
+        "correct": false
+      },
+      {
+        "text": "An ion",
+        "correct": false
+      },
+      {
+        "text": "An element",
+        "correct": true
+      },
+      {
+        "text": "A molecule",
+        "correct": false
+      }
+    ]
+  },
+  {
+    "type": "SELECT",
+    "question": "Which of these substances is given as an example of an element?",
+    "order": 4,
+    "challenge_options": [
+      {
+        "text": "Water",
+        "correct": false
+      },
+      {
+        "text": "Gold",
+        "correct": true
+      },
+      {
+        "text": "Salt",
+        "correct": false
+      },
+      {
+        "text": "Air",
+        "correct": false
+      }
+    ]
+  },
+  {
+    "type": "SELECT",
+    "question": "What is the primary characteristic of an atom in relation to its role as a building block?",
+    "order": 5,
+    "challenge_options": [
+      {
+        "text": "It can be easily split into smaller pieces.",
+        "correct": false
+      },
+      {
+        "text": "It is the largest particle found in nature.",
+        "correct": false
+      },
+      {
+        "text": "It is the fundamental unit from which everything around us is built.",
+        "correct": true
+      },
+      {
+        "text": "It is always found in combination with other types of atoms.",
+        "correct": false
+      }
+    ]
+  }
+]

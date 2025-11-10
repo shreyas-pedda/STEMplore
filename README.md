@@ -62,7 +62,7 @@ stemplore-question-generator/
 │   └── 
 │
 └── data/                    # Store curriculum samples and outputted files here for easy use
-    ├── uploads/             # Uploaded slides curriculum for testing
+    ├── inputs/             # Uploaded slides curriculum for testing
     └── outputs/             # Generated JSON files
 ```
 
