@@ -21,13 +21,13 @@ User Upload (.pptx)
     ↓
 [Slides Extractor] → Extract text, notes, titles
     ↓
-[Embedding Generator] → Create vector embeddings (HuggingFace)
+[Embedding Generator] → Create vector embeddings (HuggingFace or other free models)
     ↓
 [ChromaDB Vector Store] → Store for semantic retrieval
     ↓
-[Question Generator] → Generate questions via LLM (OpenAI/Anthropic)
+[Question Generator] → Generate questions via LLM 
     ↓
-[JSON Formatter] → Format to STEMplore schema
+[JSON Formatter] → Format to required STEMplore schema
     ↓
 Output JSON File
 ```
