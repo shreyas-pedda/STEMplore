@@ -150,7 +150,10 @@ Create a `.env` file with:
 
 - Look into finding best working open-source models for our usage, if necessary we will reach out for funding.
 - https://huggingface.co/models
-Find models 
+
+Possible Models I Found:
+* https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2
+* https://huggingface.co/BAAI/bge-m3
 
 ## Testing
 
