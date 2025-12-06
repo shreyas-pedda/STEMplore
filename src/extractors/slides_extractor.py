@@ -53,6 +53,7 @@ class SlidesExtractor:
         
         return content
 
+# Testing code statically pulls from the Intro to Java presentation file 
 if __name__ == "__main__":
     extractor = SlidesExtractor()
     content = extractor.extract_from_file(Path("data/inputs/Intro to Java.pptx"))
