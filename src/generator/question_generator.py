@@ -4,19 +4,19 @@ from typing import List, Dict, Any
 from dotenv import load_dotenv
 from groq import Groq
 
-class MockChromaDB:
-    def get_relevant_chunks(self, lesson_id: str) -> List[Dict[str, Any]]:
-        print(f"Fetching mock slide chunks for lesson_id: {lesson_id}")
-        return [
-            {"slide_id": 1, "text": "Introduction to Python programming.", "metadata": {"lesson_id": lesson_id}},
-            {"slide_id": 2, "text": "Discussing variables, data types, and basic syntax.", "metadata": {"lesson_id": lesson_id}},
-            {"slide_id": 3, "text": "Exploring control flow with if-else statements and loops.", "metadata": {"lesson_id": lesson_id}},
-        ]
+import sys
+from pathlib import Path
+
+# Add project root to sys.path to allow imports from src
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
+
+from src.vectorstore.chroma_db import ChromaDBStore
 
 class QuestionGenerator:
     def __init__(self):
         self.client = Groq()
         self.model = "llama-3.3-70b-versatile"
+        self.vector_store = ChromaDBStore()
 
     def _get_prompt_text(self, lesson_title: str, slide_context: str) -> str:
         template = f"""
@@ -93,8 +93,9 @@ class QuestionGenerator:
             return []
 
     def generate_questions_for_lesson(self, lesson_id: str, lesson_title: str) -> List[Dict[str, Any]]:
-        mock_db = MockChromaDB()
-        slide_chunks = mock_db.get_relevant_chunks(lesson_id)
+        # Retrieve context from Vector Store
+        slide_chunks = self.vector_store.get_relevant_chunks(lesson_id, n_results=50)
+        
         if not slide_chunks:
             print(f"No content found for lesson_id: {lesson_id}")
             return []
