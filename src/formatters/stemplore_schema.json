@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stemplore.local/schema/question-set.json",
+  "title": "STEMplore Question Set",
+  "description": "Schema for STEMplore-compatible multiple choice question JSON.",
+  "type": "array",
+  "minItems": 1,
+  "items": {
+    "type": "object",
+    "description": "A single STEMplore multiple-choice question.",
+    "additionalProperties": false,
+    "required": ["type", "question", "order", "challenge_options"],
+    "properties": {
+      "type": {
+        "type": "string",
+        "description": "Challenge type; always SELECT for multiple choice.",
+        "enum": [
+          "SELECT"
+        ]
+      },
+      "imageSrc": {
+        "type": "string",
+        "description": "Optional image URL associated with the question."
+      },
+      "question": {
+        "type": "string",
+        "description": "The question text presented to the learner."
+      },
+      "order": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "One-based ordering index for questions in the lesson."
+      },
+      "challenge_options": {
+        "type": "array",
+        "description": "Array of exactly four answer options (no letter prefixes).",
+        "minItems": 4,
+        "maxItems": 4,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["text", "correct"],
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "Answer choice text."
+            },
+            "correct": {
+              "type": "boolean",
+              "description": "Whether this option is the correct answer."
+            },
+            "imageSrc": {
+              "type": "string",
+              "description": "Optional image URL associated with this option."
+            }
+          }
+        },
+        "contains": {
+          "type": "object",
+          "required": ["correct"],
+          "properties": {
+            "correct": {
+              "const": true
+            }
+          }
+        },
+        "minContains": 1,
+        "maxContains": 1
+      }
+    }
+  }
+}
