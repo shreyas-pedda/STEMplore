@@ -6,14 +6,13 @@ import tempfile
 import os
 from typing import List, Dict, Any
 
-# Page config MUST be first Streamlit command
 st.set_page_config(
     page_title="STEMplore",
     page_icon="",
     layout="wide"
 )
 
-# Add parent directory to path to import src modules
+# Parent directories
 sys.path.append(str(Path(__file__).parent.parent))
 
 try:
@@ -23,7 +22,7 @@ try:
     from src.generator.question_generator import QuestionGenerator
     from dotenv import load_dotenv
     
-    # Load environment variables from .env file (GROQ_API_KEY is used by QuestionGenerator)
+    # Load environment variables
     load_dotenv()
 except Exception as e:
     st.error(f"Error importing modules: {e}")
@@ -38,26 +37,7 @@ st.info("Page loaded (for debugging purposes)")
 
 def format_questions_to_stemplore(raw_questions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    Convert questions from generator format to STEMplore format.
-    
-    Generator format:
-    {
-        "question_type": "MCQ" | "True/False",
-        "question_text": str,
-        "options": List[str],
-        "answer": str,
-        "slide_id": int
-    }
-    
-    STEMplore format:
-    {
-        "type": "SELECT",
-        "question": str,
-        "order": int,
-        "challenge_options": [
-            {"text": str, "correct": bool}
-        ]
-    }
+    Convert questions from generator format to STEMplore required format.
     """
     formatted = []
     
@@ -67,15 +47,14 @@ def format_questions_to_stemplore(raw_questions: List[Dict[str, Any]]) -> List[D
         options = question.get('options', [])
         answer = question.get('answer', '')
         
-        # Skip if missing required fields
         if not question_text:
             continue
         
-        # Format challenge options
+        # Format  options
         challenge_options = []
         
         if question_type in ['MCQ', 'MULTIPLE CHOICE']:
-            # Multiple choice question
+            # MCQS
             for option in options:
                 challenge_options.append({
                     "text": str(option),
@@ -91,7 +70,6 @@ def format_questions_to_stemplore(raw_questions: List[Dict[str, Any]]) -> List[D
             formatted.append(formatted_question)
             
         elif question_type in ['TRUE/FALSE', 'TRUE_FALSE', 'BOOLEAN']:
-            # True/False question (also formatted as SELECT)
             for option in ['True', 'False']:
                 challenge_options.append({
                     "text": option,
@@ -111,26 +89,20 @@ def format_questions_to_stemplore(raw_questions: List[Dict[str, Any]]) -> List[D
 
 def generate_questions_with_real_db(lesson_id: str, lesson_title: str, db: ChromaDBStore) -> List[Dict[str, Any]]:
     """
-    Generate questions using the real ChromaDB instead of MockChromaDB.
-    Uses QuestionGenerator's methods but with real DB data.
+    generate with chroma db
     """
-    # Get slide chunks from real database
+    # Get slide chunks
     slide_chunks = db.get_relevant_chunks(lesson_id)
     if not slide_chunks:
         st.warning(f"No content found for lesson_id: {lesson_id}")
         return []
     
-    # Use QuestionGenerator's methods instead of duplicating code
     question_generator = QuestionGenerator()
-    
-    # Format context using QuestionGenerator's method
     slide_context = question_generator._format_context(slide_chunks)
-    
-    # Get prompt using QuestionGenerator's method
     prompt_text = question_generator._get_prompt_text(lesson_title, slide_context)
     
     try:
-        # Use QuestionGenerator's client and model
+        # Use QuestionGenerator
         completion = question_generator.client.chat.completions.create(
             model=question_generator.model,
             messages=[
@@ -174,9 +146,9 @@ with st.sidebar:
     4. Download the generated JSON
     """)
     
-    st.markdown("---")
-    st.markdown("### ℹ️ Note")
-    st.info("GROQ key shud be in .env file")
+    # st.markdown("---")
+    # st.markdown("###Note")
+    # st.info("GROQ key shud be in .env file")
 
 # Main content area
 uploaded_file = st.file_uploader(
@@ -187,7 +159,7 @@ uploaded_file = st.file_uploader(
 
 if uploaded_file is not None:
     # Show file info
-    st.success(f"✅ File uploaded: {uploaded_file.name}")
+    st.success(f"File uploaded: {uploaded_file.name}")
     st.info(f"File size: {uploaded_file.size / 1024:.2f} KB")
     
     if not lesson_title:
@@ -198,12 +170,11 @@ if uploaded_file is not None:
         if lesson_title:
             with st.spinner("Processing your presentation..."):
                 try:
-                    # Step 1: Save uploaded file temporarily
                     with tempfile.NamedTemporaryFile(delete=False, suffix='.pptx') as tmp_file:
                         tmp_file.write(uploaded_file.getvalue())
                         tmp_path = Path(tmp_file.name)
                     
-                    # Step 2: Extract slides
+                    # extraction
                     progress_bar = st.progress(0)
                     status_text = st.empty()
                     status_text.text("📄 Extracting slides...")
@@ -212,14 +183,14 @@ if uploaded_file is not None:
                     progress_bar.progress(20)
                     st.success(f"✅ Extracted {len(slides_data)} slides")
                     
-                    # Step 3: Generate embeddings
+                    #Generate embeddings
                     status_text.text(" Generating embeddings...")
                     embedding_generator = EmbeddingGenerator()
                     embeddings_data = embedding_generator.generate_embeddings_batch(slides_data)
                     progress_bar.progress(40)
                     st.success(f"✅ Generated embeddings for {len(embeddings_data)} slides")
                     
-                    # Step 4: Store in ChromaDB
+                    #Store in ChromaDB
                     status_text.text(" Storing in vector database...")
                     lesson_id = lesson_title.lower().replace(" ", "-").replace("_", "-")
                     # Remove special characters
@@ -229,7 +200,7 @@ if uploaded_file is not None:
                     progress_bar.progress(60)
                     st.success(f"✅ Stored slides in database (lesson_id: {lesson_id})")
                     
-                    # Step 5: Generate questions using real DB
+                    # Generate questions using real DB
                     status_text.text(" Generating questions with AI...")
                     raw_questions = generate_questions_with_real_db(
                         lesson_id=lesson_id,
@@ -239,7 +210,7 @@ if uploaded_file is not None:
                     progress_bar.progress(80)
                     
                     if raw_questions:
-                        # Step 6: Format to JSON
+                        #Format to JSON
                         status_text.text(" Formatting output...")
                         formatted_questions = format_questions_to_stemplore(raw_questions)
                         progress_bar.progress(100)
@@ -293,12 +264,10 @@ if st.session_state.questions_generated:
     st.markdown("---")
     json_str = json.dumps(st.session_state.questions_generated, indent=2)
     st.download_button(
-        label="📥 Download JSON",
+        label="Download JSON",
         data=json_str,
         file_name=f"{st.session_state.lesson_id}_questions.json",
         mime="application/json"
     )
-    
-    # Show full JSON in expander
-    with st.expander("📄 View Full JSON"):
+    with st.expander("View Full JSON"):
         st.code(json_str, language="json")
