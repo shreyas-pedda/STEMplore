@@ -16,23 +16,22 @@ st.set_page_config(
 sys.path.append(str(Path(__file__).parent.parent))
 
 try:
-    from src.extractors.slides_extractor import SlidesExtractor
+    from src.extractors.unified_extractor import UnifiedExtractor
     from src.embeddings.embedding_generator import EmbeddingGenerator
     from src.vectorstore.chroma_db import ChromaDBStore
     from src.generator.question_generator import QuestionGenerator
     from dotenv import load_dotenv
-    
-    # Load environment variables
+
     load_dotenv()
+    unified_extractor = UnifiedExtractor()
+    SUPPORTED_TYPES = unified_extractor.supported_extensions()
 except Exception as e:
     st.error(f"Error importing modules: {e}")
     st.stop()
 
-#debug
 st.title("Prototype: STEMplore Question Generator")
-st.markdown("Upload a PowerPoint presentation to generate curriculum questions automatically.")
-
-st.info("Page loaded (for debugging purposes)")
+st.markdown("Upload **presentations, PDFs, text, images, or video/audio** to generate curriculum questions automatically.")
+st.caption("Supported: PPTX, PDF, TXT, MD, PNG, JPG, GIF, WebP, MP4, WebM, AVI, MOV, MP3, WAV, and more.")
 
 
 def format_questions_to_stemplore(raw_questions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -141,7 +140,7 @@ with st.sidebar:
     st.markdown("### 📋 Instructions")
     st.markdown("""
     1. Enter a lesson title
-    2. Upload a .pptx file
+    2. Upload a file (PPTX, PDF, text, image, or video/audio)
     3. Click 'Generate Questions'
     4. Download the generated JSON
     """)
@@ -150,11 +149,12 @@ with st.sidebar:
     # st.markdown("###Note")
     # st.info("GROQ key shud be in .env file")
 
-# Main content area
+# Main content area – accept all supported formats (no dot for streamlit type list)
+upload_types = [ext.lstrip(".") for ext in SUPPORTED_TYPES]
 uploaded_file = st.file_uploader(
-    "Upload PowerPoint File (.pptx)",
-    type=['pptx'],
-    help="Upload a PowerPoint presentation file"
+    "Upload content (PPTX, PDF, text, image, video/audio)",
+    type=upload_types,
+    help="Upload a presentation, document, image, or media file to generate questions from."
 )
 
 if uploaded_file is not None:
@@ -168,37 +168,35 @@ if uploaded_file is not None:
     # Generate button
     if st.button("🚀 Generate Questions", type="primary", disabled=not lesson_title):
         if lesson_title:
-            with st.spinner("Processing your presentation..."):
+            suffix = Path(uploaded_file.name).suffix or ".bin"
+            with st.spinner("Processing your file..."):
                 try:
-                    with tempfile.NamedTemporaryFile(delete=False, suffix='.pptx') as tmp_file:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
                         tmp_file.write(uploaded_file.getvalue())
                         tmp_path = Path(tmp_file.name)
-                    
-                    # extraction
+
                     progress_bar = st.progress(0)
                     status_text = st.empty()
-                    status_text.text("📄 Extracting slides...")
-                    extractor = SlidesExtractor()
-                    slides_data = extractor.extract_from_file(tmp_path)
+                    status_text.text("📄 Extracting content...")
+                    slides_data = unified_extractor.extract_from_file(tmp_path)
                     progress_bar.progress(20)
-                    st.success(f"✅ Extracted {len(slides_data)} slides")
+                    st.success(f"✅ Extracted {len(slides_data)} content chunk(s)")
                     
                     #Generate embeddings
                     status_text.text(" Generating embeddings...")
                     embedding_generator = EmbeddingGenerator()
                     embeddings_data = embedding_generator.generate_embeddings_batch(slides_data)
                     progress_bar.progress(40)
-                    st.success(f"✅ Generated embeddings for {len(embeddings_data)} slides")
-                    
+                    st.success(f"✅ Generated embeddings for {len(embeddings_data)} chunk(s)")
+
                     #Store in ChromaDB
                     status_text.text(" Storing in vector database...")
                     lesson_id = lesson_title.lower().replace(" ", "-").replace("_", "-")
-                    # Remove special characters
-                    lesson_id = ''.join(c for c in lesson_id if c.isalnum() or c == '-')
+                    lesson_id = "".join(c for c in lesson_id if c.isalnum() or c == "-")
                     db = ChromaDBStore()
                     db.add_slides(lesson_id, embeddings_data)
                     progress_bar.progress(60)
-                    st.success(f"✅ Stored slides in database (lesson_id: {lesson_id})")
+                    st.success(f"✅ Stored in database (lesson_id: {lesson_id})")
                     
                     # Generate questions using real DB
                     status_text.text(" Generating questions with AI...")

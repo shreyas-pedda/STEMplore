@@ -21,7 +21,7 @@ langgraph-sdk==0.2.14
 langsmith==0.4.56
 orjson==3.11.5
 ormsgpack==1.12.0
-packaging==25.0
+packaging==24.2
 pydantic==2.12.5
 pydantic_core==2.41.5
 python-dotenv==1.2.1
@@ -40,5 +40,10 @@ uuid_utils==0.12.0
 xxhash==3.6.0
 zstandard==0.25.0
 streamlit==1.39.0
+# Multi-format content extraction
+pymupdf>=1.24.0
+pytesseract>=0.3.10
+Pillow>=10.0.0
+openai-whisper>=20231117
 
 
