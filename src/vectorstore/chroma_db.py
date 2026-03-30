@@ -2,24 +2,22 @@ import chromadb
 from chromadb.config import Settings
 from typing import List, Dict, Any, Optional
 from pathlib import Path
+import uuid
 
 
 class ChromaDBStore:
     
     def __init__(self, persist_directory: str = "./chroma_db", collection_name: str = "stemplore_slides"):
-        """
-        To initialize the ChromaDB client this returns the client and collection object
-        """
         self.persist_directory = Path(persist_directory)
         self.persist_directory.mkdir(parents=True, exist_ok=True)
         
-        # Initialize ChromaDB client 
+        # Initialize ChromaDB client with persistent storage
         self.client = chromadb.PersistentClient(
             path=str(self.persist_directory),
             settings=Settings(anonymized_telemetry=False)
         )
         
-        # create collection
+        # Get or create collection
         self.collection = self.client.get_or_create_collection(
             name=collection_name,
             metadata={"description": "STEMplore slide embeddings for question generation"}
@@ -27,35 +25,46 @@ class ChromaDBStore:
     
     def add_slides(self, lesson_id: str, slides_data: List[Dict[str, Any]]) -> bool:
         """
-        Add the embeddings to the database using this function. True if successful.
+        Add slide embeddings to the database for a specific lesson.
+        
+        Args:
+            lesson_id: Unique identifier for the lesson
+            slides_data: List of slide dictionaries with keys:
+                - 'slide_number': int
+                - 'text': str (full_text content)
+                - 'embedding': List[float]
+                - 'metadata': Dict with 'title' and 'slide_number'
+        
+        Returns:
+            bool: True if successful, False otherwise
         """
         if not slides_data:
             print("No slides data provided to add.")
             return False
         
         try:
-            #data for adding to ChromaDB
+            # Prepare data for ChromaDB
             ids = []
             embeddings = []
             documents = []
             metadatas = []
             
             for slide in slides_data:
-                # Check for embedding first before adding to any list
+                # Generate unique ID for each slide
+                slide_id = f"{lesson_id}_slide_{slide['slide_number']}"
+                ids.append(slide_id)
+                
+                # Extract embedding
                 if 'embedding' not in slide:
                     print(f"Warning: Slide {slide['slide_number']} missing embedding, skipping.")
                     continue
-                
-                # Generating unique ID for each slide
-                slide_id = f"{lesson_id}_slide_{slide['slide_number']}"
-                ids.append(slide_id)
                 embeddings.append(slide['embedding'])
                 
-                # get text content
+                # Extract text content
                 text = slide.get('text', slide.get('full_text', ''))
                 documents.append(text)
                 
-                # metadata with lesson_id
+                # Prepare metadata with lesson_id
                 metadata = slide.get('metadata', {}).copy()
                 metadata['lesson_id'] = lesson_id
                 metadata['slide_id'] = slide['slide_number']
@@ -67,7 +76,7 @@ class ChromaDBStore:
                 print("No valid slides to add after processing.")
                 return False
             
-            # Add to ChromaDB
+            # Add to ChromaDB collection
             self.collection.add(
                 ids=ids,
                 embeddings=embeddings,
@@ -84,7 +93,15 @@ class ChromaDBStore:
     
     def get_relevant_chunks(self, lesson_id: str, n_results: int = 10, query_text: Optional[str] = None) -> List[Dict[str, Any]]:
         """
-        this is to retreive the relevant chunks for a lesson
+        Retrieve relevant slide chunks for a lesson.
+        
+        Args:
+            lesson_id: The lesson identifier to retrieve slides for
+            n_results: Maximum number of results to return
+            query_text: Optional query text for semantic search. If None, returns all slides for the lesson.
+        
+        Returns:
+            List of dictionaries with keys: 'slide_id', 'text', 'metadata'
         """
         try:
             if query_text:
@@ -94,6 +111,8 @@ class ChromaDBStore:
                     n_results=n_results,
                     where={"lesson_id": lesson_id}
                 )
+                
+                # Process results
                 chunks = []
                 if results['ids'] and len(results['ids'][0]) > 0:
                     for i in range(len(results['ids'][0])):
@@ -104,12 +123,12 @@ class ChromaDBStore:
                         }
                         chunks.append(chunk)
             else:
-                # Get all slides for the lesson which is filtered by lesson_id
+                # Get all slides for the lesson (filtered by lesson_id)
                 results = self.collection.get(
                     where={"lesson_id": lesson_id}
                 )
                 
-                #sorting by slide_id
+                # Process results and sort by slide_id
                 chunks = []
                 slide_data = []
                 for i in range(len(results['ids'])):
@@ -122,6 +141,8 @@ class ChromaDBStore:
                 
                 # Sort by slide_id to maintain order
                 slide_data.sort(key=lambda x: x['slide_id'])
+                
+                # Format as expected
                 for slide in slide_data[:n_results]:
                     chunks.append({
                         'slide_id': slide['slide_id'],
@@ -138,9 +159,15 @@ class ChromaDBStore:
     def delete_lesson(self, lesson_id: str) -> bool:
         """
         Delete all slides for a specific lesson.
+        
+        Args:
+            lesson_id: The lesson identifier to delete
+        
+        Returns:
+            bool: True if successful, False otherwise
         """
         try:
-            # Get all IDs
+            # Get all IDs for this lesson
             results = self.collection.get(
                 where={"lesson_id": lesson_id}
             )
@@ -160,7 +187,12 @@ class ChromaDBStore:
     def get_lesson_count(self, lesson_id: str) -> int:
         """
         Get the number of slides stored for a lesson.
-
+        
+        Args:
+            lesson_id: The lesson identifier
+        
+        Returns:
+            int: Number of slides for the lesson
         """
         try:
             results = self.collection.get(
@@ -174,9 +206,12 @@ class ChromaDBStore:
     def clear_collection(self) -> bool:
         """
         Clear all data from the collection.
+        
+        Returns:
+            bool: True if successful, False otherwise
         """
         try:
-            # Delete the collection
+            # Delete the collection and recreate it
             self.client.delete_collection(name=self.collection.name)
             self.collection = self.client.get_or_create_collection(
                 name=self.collection.name,
@@ -189,7 +224,50 @@ class ChromaDBStore:
             return False
 
 
+# Testing code
 if __name__ == "__main__":
-    # Simple test
+    from pathlib import Path
+    import sys
+    sys.path.append(str(Path(__file__).parent.parent.parent))
+    
+    from src.extractors.slides_extractor import SlidesExtractor
+    from src.embeddings.embedding_generator import EmbeddingGenerator
+    
+    # Test the ChromaDB implementation
+    print("Testing ChromaDB implementation...")
+    
+    # Extract slides
+    extractor = SlidesExtractor()
+    slides_data = extractor.extract_from_file(Path("data/inputs/Intro to Java.pptx"))
+    print(f"Extracted {len(slides_data)} slides\n")
+    
+    # Generate embeddings
+    generator = EmbeddingGenerator()
+    embeddings_data = generator.generate_embeddings_batch(slides_data)
+    print(f"Generated embeddings for {len(embeddings_data)} slides\n")
+    
+    # Initialize ChromaDB
     db = ChromaDBStore()
-    print("ChromaDB initialized!")
+    
+    # Add slides to database
+    lesson_id = "intro-to-java"
+    success = db.add_slides(lesson_id, embeddings_data)
+    print(f"Add slides result: {success}\n")
+    
+    # Get all chunks for the lesson
+    chunks = db.get_relevant_chunks(lesson_id)
+    print(f"Retrieved {len(chunks)} chunks for lesson_id: {lesson_id}")
+    if chunks:
+        print(f"\nFirst chunk preview:")
+        print(f"Slide ID: {chunks[0]['slide_id']}")
+        print(f"Text preview: {chunks[0]['text'][:100]}...")
+        print(f"Metadata: {chunks[0]['metadata']}")
+    
+    # Test semantic search
+    print(f"\n--- Testing Semantic Search ---")
+    search_chunks = db.get_relevant_chunks(lesson_id, query_text="What is Java?", n_results=3)
+    print(f"Found {len(search_chunks)} relevant chunks for query 'What is Java?'")
+    if search_chunks:
+        print(f"Most relevant chunk: {search_chunks[0]['text'][:150]}...")
+    
+    print("\nChromaDB test completed!")
