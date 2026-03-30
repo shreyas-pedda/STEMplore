@@ -205,6 +205,5 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
-
-# ChromaDB
-chroma_db/
+#Ignores all the chromadb files 
+chroma_db/ 

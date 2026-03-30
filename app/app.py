@@ -31,7 +31,6 @@ except Exception as e:
 #debug
 st.title("Prototype: STEMplore Question Generator")
 st.markdown("Upload a PowerPoint presentation to generate curriculum questions automatically.")
-
 st.info("Page loaded (for debugging purposes)")
 
 
@@ -133,9 +132,9 @@ if 'lesson_id' not in st.session_state:
 
 # Sidebar for configuration
 with st.sidebar:
-    st.header("⚙️ Configuration")
+    st.header("Configuration")
     lesson_title = st.text_input("Lesson Title", placeholder="e.g., Introduction to Java")
-    num_questions = st.number_input("Number of Questions", min_value=1, max_value=50, value=10, disabled=True, help="Coming soon: customize number of questions")
+    num_questions = st.number_input("Number of Questions", min_value=1, max_value=50, disabled=False)
     
     st.markdown("---")
     st.markdown("### 📋 Instructions")
@@ -162,8 +161,8 @@ if uploaded_file is not None:
     st.success(f"File uploaded: {uploaded_file.name}")
     st.info(f"File size: {uploaded_file.size / 1024:.2f} KB")
     
-    if not lesson_title:
-        st.warning("⚠️ Please enter a lesson title in the sidebar before generating questions.")
+    # if not lesson_title:
+    #     st.warning("⚠️ Please enter a lesson title in the sidebar before generating questions.")
     
     # Generate button
     if st.button("🚀 Generate Questions", type="primary", disabled=not lesson_title):
