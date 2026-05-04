@@ -3,7 +3,7 @@ Unified content extractor: routes to the appropriate extractor by file type.
 All extractors return a list of chunks with: slide_number, title, text_content, full_text.
 
 Google Slides URLs are not handled here; use google_slides_extractor.extract_chunks_from_slides_url
-in the app/API layer so this module stays file-path only (easier to ship video vs Slides PRs).
+in the app/API layer (this module is file-path only).
 """
 from pathlib import Path
 from typing import List, Dict, Optional
