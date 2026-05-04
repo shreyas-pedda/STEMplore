@@ -12,7 +12,7 @@ class SlidesExtractor:
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
         
-        if file_path.suffix != self.supported_format:
+        if file_path.suffix.lower() != self.supported_format:
             raise ValueError(f"Unsupported format: {file_path.suffix}")
         
         prs = Presentation(file_path)

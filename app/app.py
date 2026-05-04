@@ -140,7 +140,7 @@ with st.sidebar:
     st.markdown("### 📋 Instructions")
     st.markdown("""
     1. Enter a lesson title
-    2. Upload a file (PPTX, PDF, text, image, or video/audio)
+    2. Upload a file and/or paste a Google Slides link (anyone-with-link can view)
     3. Click 'Generate Questions'
     4. Download the generated JSON
     """)
@@ -151,88 +151,95 @@ with st.sidebar:
 
 # Main content area – accept all supported formats (no dot for streamlit type list)
 upload_types = [ext.lstrip(".") for ext in SUPPORTED_TYPES]
+slides_url = st.text_input(
+    "Google Slides (optional)",
+    "",
+    placeholder="https://docs.google.com/presentation/d/...",
+    help="Share the deck as 'Anyone with the link can view'. If set, this takes priority over an uploaded file.",
+)
 uploaded_file = st.file_uploader(
     "Upload content (PPTX, PDF, text, image, video/audio)",
     type=upload_types,
-    help="Upload a presentation, document, image, or media file to generate questions from."
+    help="Upload a presentation, document, image, or media file to generate questions from.",
 )
 
-if uploaded_file is not None:
-    # Show file info
+url_trim = slides_url.strip()
+if url_trim:
+    st.info("Source: Google Slides URL")
+elif uploaded_file is not None:
     st.success(f"File uploaded: {uploaded_file.name}")
-    st.info(f"File size: {uploaded_file.size / 1024:.2f} KB")
-    
-    # if not lesson_title:
-    #     st.warning("⚠️ Please enter a lesson title in the sidebar before generating questions.")
-    
-    # Generate button
-    if st.button("🚀 Generate Questions", type="primary", disabled=not lesson_title):
-        if lesson_title:
-            suffix = Path(uploaded_file.name).suffix or ".bin"
-            with st.spinner("Processing your file..."):
-                try:
+    st.caption(f"File size: {uploaded_file.size / 1024:.2f} KB")
+else:
+    st.caption("Upload a file or paste a Google Slides link, enter a lesson title in the sidebar, then generate.")
+
+has_source = bool(url_trim) or uploaded_file is not None
+can_run = bool(lesson_title) and has_source
+
+if st.button("🚀 Generate Questions", type="primary", disabled=not can_run):
+    if lesson_title:
+        tmp_path: Path | None = None
+        with st.spinner("Processing your lesson source..."):
+            try:
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                status_text.text("📄 Extracting content...")
+                if url_trim:
+                    from src.extractors.google_slides_extractor import extract_chunks_from_slides_url
+
+                    slides_data = extract_chunks_from_slides_url(url_trim)
+                else:
+                    assert uploaded_file is not None
+                    suffix = Path(uploaded_file.name).suffix or ".bin"
                     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
                         tmp_file.write(uploaded_file.getvalue())
                         tmp_path = Path(tmp_file.name)
-
-                    progress_bar = st.progress(0)
-                    status_text = st.empty()
-                    status_text.text("📄 Extracting content...")
                     slides_data = unified_extractor.extract_from_file(tmp_path)
-                    progress_bar.progress(20)
-                    st.success(f"✅ Extracted {len(slides_data)} content chunk(s)")
-                    
-                    #Generate embeddings
-                    status_text.text(" Generating embeddings...")
-                    embedding_generator = EmbeddingGenerator()
-                    embeddings_data = embedding_generator.generate_embeddings_batch(slides_data)
-                    progress_bar.progress(40)
-                    st.success(f"✅ Generated embeddings for {len(embeddings_data)} chunk(s)")
 
-                    #Store in ChromaDB
-                    status_text.text(" Storing in vector database...")
-                    lesson_id = lesson_title.lower().replace(" ", "-").replace("_", "-")
-                    lesson_id = "".join(c for c in lesson_id if c.isalnum() or c == "-")
-                    db = ChromaDBStore()
-                    db.add_slides(lesson_id, embeddings_data)
-                    progress_bar.progress(60)
-                    st.success(f"✅ Stored in database (lesson_id: {lesson_id})")
-                    
-                    # Generate questions using real DB
-                    status_text.text(" Generating questions with AI...")
-                    raw_questions = generate_questions_with_real_db(
-                        lesson_id=lesson_id,
-                        lesson_title=lesson_title,
-                        db=db
-                    )
-                    progress_bar.progress(80)
-                    
-                    if raw_questions:
-                        #Format to JSON
-                        status_text.text(" Formatting output...")
-                        formatted_questions = format_questions_to_stemplore(raw_questions)
-                        progress_bar.progress(100)
-                        status_text.text("✅ Complete!")
-                        st.success(f"✅ Generated {len(formatted_questions)} questions")
-                        
-                        # Store in session state
-                        st.session_state.questions_generated = formatted_questions
-                        st.session_state.lesson_id = lesson_id
-                        
-                        # Clean up temp file
-                        os.unlink(tmp_path)
-                        
-                        st.balloons()
-                    else:
-                        st.error("❌ Failed to generate questions. Please try again.")
-                        os.unlink(tmp_path)
-                        
-                except Exception as e:
-                    st.error(f"❌ Error: {str(e)}")
-                    import traceback
-                    st.code(traceback.format_exc())
-                    if 'tmp_path' in locals() and tmp_path.exists():
-                        os.unlink(tmp_path)
+                progress_bar.progress(20)
+                st.success(f"✅ Extracted {len(slides_data)} content chunk(s)")
+
+                status_text.text(" Generating embeddings...")
+                embedding_generator = EmbeddingGenerator()
+                embeddings_data = embedding_generator.generate_embeddings_batch(slides_data)
+                progress_bar.progress(40)
+                st.success(f"✅ Generated embeddings for {len(embeddings_data)} chunk(s)")
+
+                status_text.text(" Storing in vector database...")
+                lesson_id = lesson_title.lower().replace(" ", "-").replace("_", "-")
+                lesson_id = "".join(c for c in lesson_id if c.isalnum() or c == "-")
+                db = ChromaDBStore()
+                db.add_slides(lesson_id, embeddings_data)
+                progress_bar.progress(60)
+                st.success(f"✅ Stored in database (lesson_id: {lesson_id})")
+
+                status_text.text(" Generating questions with AI...")
+                raw_questions = generate_questions_with_real_db(
+                    lesson_id=lesson_id,
+                    lesson_title=lesson_title,
+                    db=db,
+                )
+                progress_bar.progress(80)
+
+                if raw_questions:
+                    status_text.text(" Formatting output...")
+                    formatted_questions = format_questions_to_stemplore(raw_questions)
+                    progress_bar.progress(100)
+                    status_text.text("✅ Complete!")
+                    st.success(f"✅ Generated {len(formatted_questions)} questions")
+                    st.session_state.questions_generated = formatted_questions
+                    st.session_state.lesson_id = lesson_id
+                    st.balloons()
+                else:
+                    st.error("❌ Failed to generate questions. Please try again.")
+
+            except Exception as e:
+                st.error(f"❌ Error: {str(e)}")
+                import traceback
+
+                st.code(traceback.format_exc())
+            finally:
+                if tmp_path is not None and tmp_path.exists():
+                    os.unlink(tmp_path)
 
 # Display results
 if st.session_state.questions_generated:
