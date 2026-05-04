@@ -11,9 +11,8 @@ class ChromaDBStore:
         self.persist_directory = Path(persist_directory)
         self.persist_directory.mkdir(parents=True, exist_ok=True)
         
-        # Initialize ChromaDB client with persistent storage
-        self.client = chromadb.PersistentClient(
-            path=str(self.persist_directory),
+        # Initialize ChromaDB client with ephemeral (in-memory) storage for Vercel
+        self.client = chromadb.EphemeralClient(
             settings=Settings(anonymized_telemetry=False)
         )
         

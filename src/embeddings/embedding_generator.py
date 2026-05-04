@@ -1,27 +1,36 @@
+import os
 from typing import List, Dict
-from sentence_transformers import SentenceTransformer
 from pathlib import Path
+from huggingface_hub import InferenceClient
+from dotenv import load_dotenv
+
+# Add project root to path for local testing
 import sys
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from src.extractors.slides_extractor import SlidesExtractor
 
-
+load_dotenv()
 
 class EmbeddingGenerator:
-    def __init__(self, model_name: str = 'sentence-transformers/all-MiniLM-L6-v2' ):
+    def __init__(self, model_name: str = 'sentence-transformers/all-MiniLM-L6-v2'):
         self.model_name = model_name
-        self.model = None
+        self.api_key = os.getenv("HUGGINGFACE_API_KEY")
+        if not self.api_key:
+            raise ValueError("HUGGINGFACE_API_KEY not found in environment variables")
+        self.client = InferenceClient(token=self.api_key)
 
-    def _load_model(self) -> SentenceTransformer:
-        if self.model is None:
-            self.model = SentenceTransformer(self.model_name)
-        return self.model
-    
-    #helper to create a slide embedding
-    def generate_embedding(self,text:str) -> List[float]:
-       model = self._load_model()
-       embedding = model.encode(text) 
-       return embedding.tolist() #numpy arrays to python lists
+    def generate_embedding(self, text: str) -> List[float]:
+        """Generate embedding using HuggingFace Inference API"""
+        try:
+            # The feature_extraction task returns the embedding vector
+            embedding = self.client.feature_extraction(text, model=self.model_name)
+            # The API returns a list or numpy array depending on the client version
+            if hasattr(embedding, "tolist"):
+                return embedding.tolist()
+            return list(embedding)
+        except Exception as e:
+            print(f"Error generating embedding via API: {e}")
+            raise e
     
     #processing multiple slides at once
     #using content output from extractor to create embedding for each slide, adding this to output dictionary 
