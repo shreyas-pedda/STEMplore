@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 # Append parent directory to sys.path to allow relative imports
 sys.path.append(str(Path(__file__).parent.parent))
 
-from src.extractors.slides_extractor import SlidesExtractor
+from src.extractors.unified_extractor import UnifiedExtractor
 from src.embeddings.embedding_generator import EmbeddingGenerator
 from src.vectorstore.chroma_db import ChromaDBStore
 from src.generator.question_generator import QuestionGenerator
@@ -130,21 +130,45 @@ def generate_questions_with_real_db(
 
 
 @app.post("/api/generate-questions")
-async def generate_questions(lessonId: str = Form(...), file: UploadFile = File(...)):
-    if not file.filename.endswith(".pptx"):
-        raise HTTPException(status_code=400, detail="Only .pptx files are supported.")
+async def generate_questions(
+    lessonId: str = Form(...),
+    file: UploadFile | None = File(None),
+    slidesUrl: str | None = Form(None),
+):
+    """
+    Generate questions from an uploaded lesson file (PPTX, PDF, text, image, video/audio, etc.)
+    or from a public Google Slides URL (slidesUrl).
+    """
+    extractor = UnifiedExtractor()
+    allowed = {ext.lower() for ext in extractor.supported_extensions()}
+    url = (slidesUrl or "").strip() or None
 
-    # Create temporary file to store the upload
     tmp_path = None
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pptx") as tmp_file:
-            content = await file.read()
-            tmp_file.write(content)
-            tmp_path = Path(tmp_file.name)
+        if url:
+            from src.extractors.google_slides_extractor import extract_chunks_from_slides_url
 
-        # 1. Extraction
-        extractor = SlidesExtractor()
-        slides_data = extractor.extract_from_file(tmp_path)
+            slides_data = extract_chunks_from_slides_url(url)
+        elif file is not None and file.filename:
+            suffix = Path(file.filename).suffix.lower()
+            if suffix not in allowed:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Unsupported file type: {suffix or '(none)'}. "
+                        f"Supported extensions: {', '.join(sorted(allowed))}"
+                    ),
+                )
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
+                content = await file.read()
+                tmp_file.write(content)
+                tmp_path = Path(tmp_file.name)
+            slides_data = extractor.extract_from_file(tmp_path)
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Provide either an uploaded file or slidesUrl (Google Slides link).",
+            )
         if not slides_data:
             raise HTTPException(
                 status_code=400,
@@ -182,11 +206,13 @@ async def generate_questions(lessonId: str = Form(...), file: UploadFile = File(
         # JSONResponse will automatically serialize the list to JSON
         return JSONResponse(content=formatted_questions)
 
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        # Catch unexpected errors to avoid server crash, return as HTTP 500
         raise HTTPException(status_code=500, detail=str(e))
 
     finally:
-        # 7. Clean up temp file
-        if tmp_path and tmp_path.exists():
+        if tmp_path is not None and tmp_path.exists():
             os.unlink(tmp_path)
