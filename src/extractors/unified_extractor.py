@@ -1,6 +1,9 @@
 """
 Unified content extractor: routes to the appropriate extractor by file type.
 All extractors return a list of chunks with: slide_number, title, text_content, full_text.
+
+Google Slides URLs are not handled here; use google_slides_extractor.extract_chunks_from_slides_url
+in the app/API layer (this module is file-path only).
 """
 from pathlib import Path
 from typing import List, Dict, Optional
@@ -25,11 +28,12 @@ try:
 except Exception:
     pass
 
-# try:
-#     from src.extractors.video_extractor import VideoExtractor
-#     _video_extractor = VideoExtractor
-# except Exception:
-#     pass
+try:
+    from src.extractors.video_extractor import VideoExtractor
+
+    _video_extractor = VideoExtractor
+except Exception:
+    pass
 
 
 # All supported extensions and their extractor names
@@ -70,7 +74,7 @@ class UnifiedExtractor:
         self._text = TextExtractor()
         self._pdf = _pdf_extractor() if _pdf_extractor else None
         self._image = _image_extractor() if _image_extractor else None
-        # self._video = _video_extractor(model_size="base") if _video_extractor else None
+        self._video = _video_extractor(model_size="base") if _video_extractor else None
 
     def supported_extensions(self) -> List[str]:
         """Return list of supported extensions with dot (e.g. ['.pptx', '.pdf', '.txt', ...])."""
@@ -79,8 +83,20 @@ class UnifiedExtractor:
             out.append(".pdf")
         if self._image:
             out.extend([".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tiff", ".tif"])
-        # if self._video:
-        #     out.extend([".mp4", ".webm", ".avi", ".mov", ".mkv", ".m4a", ".wav", ".mp3", ".flac"])
+        if self._video:
+            out.extend(
+                [
+                    ".mp4",
+                    ".webm",
+                    ".avi",
+                    ".mov",
+                    ".mkv",
+                    ".m4a",
+                    ".wav",
+                    ".mp3",
+                    ".flac",
+                ]
+            )
         return sorted(set(out))
 
     def extract_from_file(self, file_path: Path) -> List[Dict]:
@@ -107,8 +123,11 @@ class UnifiedExtractor:
             if not self._image:
                 raise ImportError("Image OCR not available. Install pytesseract and Pillow, and install Tesseract.")
             return self._image.extract_from_file(path)
-        # if kind == "video":
-        #     if not self._video:
-        #         raise ImportError("Video transcription not available. Install openai-whisper and ffmpeg.")
-        #     return self._video.extract_from_file(path)
+        if kind == "video":
+            if not self._video:
+                raise ImportError(
+                    "Video/audio transcription not available. "
+                    "Install openai-whisper and ffmpeg, and ensure ffmpeg is on PATH."
+                )
+            return self._video.extract_from_file(path)
         raise ValueError(f"Unknown extractor kind: {kind}")
