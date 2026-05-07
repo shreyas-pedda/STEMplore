@@ -18,10 +18,15 @@ class QuestionGenerator:
         self.model = "llama-3.3-70b-versatile"
         self.vector_store = ChromaDBStore()
 
-    def _get_prompt_text(self, lesson_title: str, slide_context: str) -> str:
+    def _get_prompt_text(self, course: str, unit: str, lesson: str, slide_context: str) -> str:
         template = f"""
         Based on the following lesson context from a slide deck, please generate a set of questions.
-        The lesson title is "{lesson_title}".
+        This content is from:
+        - Course: {course}
+        - Unit: {unit}
+        - Lesson: {lesson}
+
+        Generate questions appropriate for this topic and level.
 
         Context from slides:
         {slide_context}
@@ -92,17 +97,17 @@ class QuestionGenerator:
             print(f"Error in JSON structure: {e}")
             return []
 
-    def generate_questions_for_lesson(self, lesson_id: str, lesson_title: str) -> List[Dict[str, Any]]:
+    def generate_questions_for_lesson(self, lesson_id: str, course: str, unit: str, lesson: str) -> List[Dict[str, Any]]:
         # Retrieve context from Vector Store
         slide_chunks = self.vector_store.get_relevant_chunks(lesson_id, n_results=50)
-        
+
         if not slide_chunks:
             print(f"No content found for lesson_id: {lesson_id}")
             return []
 
         slide_context = self._format_context(slide_chunks)
-        
-        prompt_text = self._get_prompt_text(lesson_title, slide_context)
+
+        prompt_text = self._get_prompt_text(course, unit, lesson, slide_context)
 
         print(f"Generating questions with the Groq model: {self.model}...")
         
@@ -135,12 +140,16 @@ if __name__ == '__main__':
     else:
         question_generator = QuestionGenerator()
 
-        test_lesson_id = "python-101"
-        test_lesson_title = "Introduction to Python"
+        test_lesson_id = "computer-science-intro-to-python-variables"
+        test_course = "Computer Science"
+        test_unit = "Intro to Python"
+        test_lesson = "Variables and Data Types"
 
         generated_questions = question_generator.generate_questions_for_lesson(
             lesson_id=test_lesson_id,
-            lesson_title=test_lesson_title
+            course=test_course,
+            unit=test_unit,
+            lesson=test_lesson,
         )
 
         if generated_questions:
