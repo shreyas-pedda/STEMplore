@@ -90,8 +90,12 @@ def format_questions_to_stemplore(
     return formatted
 
 
+def _slugify(s: str) -> str:
+    return "".join(c if c.isalnum() else "-" for c in s.lower().strip()).strip("-")
+
+
 def generate_questions_with_real_db(
-    lesson_id: str, lesson_title: str, db: ChromaDBStore
+    lesson_id: str, course: str, unit: str, lesson: str, db: ChromaDBStore
 ) -> List[Dict[str, Any]]:
     """
     generate with chroma db
@@ -103,7 +107,7 @@ def generate_questions_with_real_db(
 
     question_generator = QuestionGenerator()
     slide_context = question_generator._format_context(slide_chunks)
-    prompt_text = question_generator._get_prompt_text(lesson_title, slide_context)
+    prompt_text = question_generator._get_prompt_text(course, unit, lesson, slide_context)
 
     try:
         # Use QuestionGenerator
@@ -131,7 +135,9 @@ def generate_questions_with_real_db(
 
 @app.post("/api/generate-questions")
 async def generate_questions(
-    lessonId: str = Form(...),
+    course: str = Form(...),
+    unit: str = Form(...),
+    lesson: str = Form(...),
     file: UploadFile | None = File(None),
     slidesUrl: str | None = Form(None),
 ):
@@ -179,18 +185,15 @@ async def generate_questions(
         embedding_generator = EmbeddingGenerator()
         embeddings_data = embedding_generator.generate_embeddings_batch(slides_data)
 
-        # 3. Store in ChromaDB
-        # Standardize lesson_id for ChromaDB
-        clean_lesson_id = lessonId.lower().replace(" ", "-").replace("_", "-")
-        clean_lesson_id = "".join(c for c in clean_lesson_id if c.isalnum() or c == "-")
+        # 3. Store in ChromaDB using a composite key: course-unit-lesson
+        composite_id = f"{_slugify(course)}-{_slugify(unit)}-{_slugify(lesson)}"
 
         db = ChromaDBStore()
-        db.add_slides(clean_lesson_id, embeddings_data)
+        db.add_slides(composite_id, embeddings_data)
 
         # 4. Generate questions using Groq and the DB context
-        # We pass lessonId as the title parameter internally
         raw_questions = generate_questions_with_real_db(
-            lesson_id=clean_lesson_id, lesson_title=lessonId, db=db
+            lesson_id=composite_id, course=course, unit=unit, lesson=lesson, db=db
         )
 
         if not raw_questions:
